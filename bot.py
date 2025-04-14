@@ -1,203 +1,51 @@
-import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from flask import Flask, request
-import requests
-import threading
-import schedule
-import time
-import pandas as pd
-import matplotlib.pyplot as plt
-import json
+# bot.py
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
-from io import BytesIO
 
-# 📌 Настройки
-TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
-MEXC_API_KEY = 'mx0vglQuKSpVyUhZnd'
-MEXC_SECRET = '325f9d3d2c4144c0aecd8dd32843d72d'
-USER_ID = 2036758982
-WEBHOOK_URL = 'https://tradingbotai-1.onrender.com/webhook'
+# Твои ключи от MEXC (вставь сам!)
+MEXC_API_KEY = os.getenv("MEXC_API_KEY")
+MEXC_API_SECRET = os.getenv("MEXC_API_SECRET")
 
-bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
+# Главная команда /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("📊 Баланс", callback_data='balance')],
+        [InlineKeyboardButton("💰 Купить", callback_data='buy'),
+         InlineKeyboardButton("🔻 Продать", callback_data='sell')],
+        [InlineKeyboardButton("⚙️ Настройки", callback_data='settings')],
+        [InlineKeyboardButton("🤖 AI-помощник", callback_data='ai')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Привет! Я твой трейдинг-бот на MEXC 💹", reply_markup=reply_markup)
 
-TOKENS = ["SOL", "JUP", "BONK", "PYTH"]
-TRADE_AMOUNT = 10
-TRADES_FILE = 'trades.json'
-WALLETS_FILE = 'wallets.json'
+# Обработка нажатий на кнопки
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-# Загрузка истории
-trades = json.load(open(TRADES_FILE)) if os.path.exists(TRADES_FILE) else []
-wallets = json.load(open(WALLETS_FILE)) if os.path.exists(WALLETS_FILE) else {}
+    if query.data == 'balance':
+        # Тут будет функция получения баланса
+        await query.edit_message_text("💼 Твой баланс: ...")
+    elif query.data == 'buy':
+        await query.edit_message_text("Введите команду /buy <пара> <кол-во>")
+    elif query.data == 'sell':
+        await query.edit_message_text("Введите команду /sell <пара> <кол-во>")
+    elif query.data == 'settings':
+        await query.edit_message_text("⚙️ Настройки: Пока пусто...")
+    elif query.data == 'ai':
+        await query.edit_message_text("🤖 AI поможет тебе в трейдинге! (в разработке)")
 
-def save_trades():
-    with open(TRADES_FILE, 'w') as f:
-        json.dump(trades, f, indent=2)
+# Запуск бота
+def main():
+    app = ApplicationBuilder().token("ТОКЕН_ТВОЕГО_ТЕЛЕГРАМ_БОТА").build()
 
-def save_wallets():
-    with open(WALLETS_FILE, 'w') as f:
-        json.dump(wallets, f, indent=2)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
 
-def get_token_price(symbol):
-    try:
-        url = f"https://www.mexc.com/open/api/v2/market/ticker?symbol={symbol}_USDT"
-        res = requests.get(url).json()
-        price = float(res['data'][0]['last'])
-        return round(price, 6)
-    except Exception as e:
-        print(f"Ошибка получения цены {symbol}: {e}")
-        return "н/д"
+    app.run_polling()
 
-def get_historical_prices(symbol="SOL"):
-    timestamps = pd.date_range(end=pd.Timestamp.now(), periods=48, freq="30min")
-    prices = [100 + (i % 5) + (i / 20.0) for i in range(48)]
-    df = pd.DataFrame({"timestamp": timestamps, "price": prices})
-    df.set_index("timestamp", inplace=True)
-    return df
-
-def calculate_indicators(df):
-    df["MA10"] = df["price"].rolling(window=10).mean()
-    delta = df["price"].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-    rs = gain / loss
-    df["RSI"] = 100 - (100 / (1 + rs))
-    return df
-
-def build_chart(symbol):
-    try:
-        df = get_historical_prices(symbol)
-        df = calculate_indicators(df)
-        plt.figure(figsize=(10, 5))
-        plt.plot(df.index, df["price"], label="Цена")
-        plt.plot(df.index, df["MA10"], label="MA10", linestyle="--")
-        plt.title(f"{symbol} - Цена и MA10")
-        plt.xlabel("Время")
-        plt.ylabel("USD")
-        plt.legend()
-        plt.grid()
-        buffer = BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
-        plt.close()
-        return buffer
-    except Exception as e:
-        print("Ошибка графика:", e)
-        return None
-
-def ai_signal(symbol):
-    try:
-        df = get_historical_prices(symbol)
-        df = calculate_indicators(df)
-        rsi = df["RSI"].iloc[-1]
-        ma = df["MA10"].iloc[-1]
-        price = df["price"].iloc[-1]
-        msg = f"📊 {symbol}:\nЦена: ${round(price,4)} | RSI: {round(rsi,1)} | MA10: ${round(ma,4)}\n"
-        if rsi < 30 and price < ma:
-            msg += "🤖 AI: Сильная точка входа (перепродан)"
-            return msg, True
-        elif rsi > 70 and price > ma:
-            msg += "🤖 AI: Время фиксировать прибыль"
-            return msg, False
-        else:
-            msg += "🤖 AI: Нейтральная зона"
-            return msg, False
-    except Exception as e:
-        return f"{symbol}: ❌ Ошибка AI-прогноза ({str(e)})", False
-
-def auto_signal():
-    full_msg = "🤖 [AI Автосигнал — 15 мин]:\n\n"
-    for token in TOKENS:
-        msg, do_trade = ai_signal(token)
-        full_msg += msg + "\n\n"
-        if do_trade:
-            price = get_token_price(token)
-            trade = {
-                "token": token,
-                "price": price,
-                "amount": TRADE_AMOUNT,
-                "timestamp": time.strftime("%Y-%m-%d %H:%M")
-            }
-            trades.append(trade)
-            save_trades()
-            bot.send_message(USER_ID, f"✅ Автосделка: Куплено {token} на ${TRADE_AMOUNT} по ${price}")
-    bot.send_message(USER_ID, full_msg)
-
-def schedule_loop():
-    schedule.every(15).minutes.do(auto_signal)
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
-@bot.message_handler(commands=['wallet'])
-def show_wallet(message):
-    uid = str(message.from_user.id)
-    if uid in wallets:
-        bot.send_message(message.chat.id, f"🔗 Ваш кошелёк:\n{wallets[uid]}")
-    else:
-        bot.send_message(message.chat.id, "❌ Кошелёк не подключён. Отправьте его в чат.")
-
-@bot.message_handler(func=lambda msg: msg.text and (msg.text.startswith("0x") or msg.text.endswith(".sol")))
-def handle_wallet_input(message):
-    uid = str(message.from_user.id)
-    wallets[uid] = message.text.strip()
-    save_wallets()
-    bot.send_message(message.chat.id, f"✅ Кошелёк сохранён:\n{wallets[uid]}")
-
-@bot.message_handler(commands=['start', 'menu'])
-def send_menu(message):
-    markup = InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(
-        InlineKeyboardButton("📈 AI сигналы", callback_data="all_signals"),
-        InlineKeyboardButton("📉 График SOL", callback_data="chart_SOL"),
-        InlineKeyboardButton("🧾 История сделок", callback_data="history"),
-        InlineKeyboardButton("🔗 Подключить кошелёк", callback_data="connect_wallet")
-    )
-    for token in TOKENS:
-        markup.add(InlineKeyboardButton(f"💰 Цена {token}", callback_data=token))
-    bot.send_message(message.chat.id, "👋 Добро пожаловать! Выберите действие:", reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
-    if call.data == "all_signals":
-        msg = "\n\n".join([ai_signal(token)[0] for token in TOKENS])
-        bot.send_message(call.message.chat.id, msg)
-    elif call.data == "history":
-        if not trades:
-            bot.send_message(call.message.chat.id, "📉 Сделок пока нет.")
-        else:
-            text = "🧾 История сделок:\n\n"
-            for t in trades[-10:]:
-                text += f"{t['timestamp']} — {t['token']} — ${t['amount']} по ${t['price']}\n"
-            bot.send_message(call.message.chat.id, text)
-    elif call.data.startswith("chart_"):
-        symbol = call.data.split("_")[1]
-        chart = build_chart(symbol)
-        if chart:
-            bot.send_photo(call.message.chat.id, chart, caption=f"📉 График {symbol}")
-        else:
-            bot.send_message(call.message.chat.id, "❌ Не удалось построить график.")
-    elif call.data in TOKENS:
-        price = get_token_price(call.data)
-        bot.send_message(call.message.chat.id, f"💰 Текущая цена {call.data}: ${price}")
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    json_str = request.get_data().decode('UTF-8')
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
-    return 'ok', 200
-
-@app.route('/')
-def index():
-    return '🤖 Бот работает (Webhook)'
-
-# Установка webhook
-bot.remove_webhook()
-bot.set_webhook(url=WEBHOOK_URL)
-
-# Запуск
 if __name__ == '__main__':
-    threading.Thread(target=schedule_loop, daemon=True).start()
-    app.run(host='0.0.0.0', port=10000)
+    main()
+
