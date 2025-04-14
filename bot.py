@@ -13,12 +13,10 @@ from io import BytesIO
 from ai_helper import analyze_message  # ⬅️ Импорт AI помощника
 from binance.client import Client
 
-with open('config.json', 'r') as f:
-    config = json.load(f)
+BINANCE_API_KEY = "yOXw4V7X3YIcPaPH4Pg3jnLChJEUHZFRQxKTrPmn9hOdnVpjcw9F445Prg7ZpWVH"
+BINANCE_API_SECRET = "L4vhAKovcc8WrbIIHvDRobbbfYVq1p0F0g3e7LrkwMC5WWXBhkA7ukEVnVbimb15"
 
-BINANCE_API_KEY = config['binance_api_key']
-BINANCE_API_SECRET = config['binance_api_secret']
-
+client = Client(BINANCE_API_KEY, BINANCE_API_SECRET)
 TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
 CMC_API_KEY = 'bd5f81f5-9e2c-4483-8060-ff7eb41b3a54'
 USER_ID = 2036758982
