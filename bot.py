@@ -45,26 +45,46 @@ def get_token_price(symbol):
     except Exception as e:
         print(f"Ошибка цены {symbol}: {e}")
         return "н/д"
+# Функция-заглушка (на случай ошибки или отсутствия токена на Binance)
+def get_fake_history(symbol):
+    print(f"⚠️ Используется фейковая история для {symbol}")
+    timestamps = pd.date_range(end=pd.Timestamp.now(), periods=48, freq="30min")
+    prices = [100 + (i % 5) + (i / 20.0) for i in range(48)]
+    df = pd.DataFrame({"timestamp": timestamps, "price": prices})
+    df.set_index("timestamp", inplace=True)
+    return df
 
 def get_historical_prices(symbol="SOL"):
     try:
-        ids = {
-            "SOL": "solana",
-            "JUP": "jupiter-exchange",
-            "BONK": "bonk",
-            "PYTH": "pyth-network"
+        # Сопоставление тикеров Binance
+        binance_pairs = {
+            "SOL": "SOLUSDT",
+            "JUP": "JUPUSDT",
+            "BONK": "BONKUSDT",
+            "PYTH": "PYTHUSDT"
         }
-        cg_id = ids.get(symbol, symbol.lower())
-        url = f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart?vs_currency=usd&days=2"
-        res = requests.get(url).json()
-        prices = res["prices"]  # формат: [[timestamp, price], ...]
-        df = pd.DataFrame(prices, columns=["timestamp", "price"])
-        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+
+        pair = binance_pairs.get(symbol.upper())
+        if not pair:
+            raise ValueError(f"❌ Неизвестный символ: {symbol}")
+
+        # Получаем 48 свечей по 30 минут (24 часа)
+        klines = binance_client.get_klines(
+            symbol=pair,
+            interval=Client.KLINE_INTERVAL_30MINUTE,
+            limit=48
+        )
+
+        timestamps = [pd.to_datetime(k[0], unit='ms') for k in klines]
+        prices = [float(k[4]) for k in klines]  # Цена закрытия свечи
+
+        df = pd.DataFrame({"timestamp": timestamps, "price": prices})
         df.set_index("timestamp", inplace=True)
         return df
+
     except Exception as e:
-        print(f"Ошибка получения истории для {symbol}: {e}")
-        return pd.DataFrame()
+        print(f"📉 Ошибка получения истории с Binance для {symbol}: {e}")
+        return get_fake_history(symbol)
 
 def calculate_indicators(df):
     df["MA10"] = df["price"].rolling(window=10).mean()
