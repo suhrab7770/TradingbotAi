@@ -10,7 +10,7 @@ import json
 import os
 from io import BytesIO
 
-TOKEN = 'твой_токен_бота'
+TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
 CMC_API_KEY = 'bd5f81f5-9e2c-4483-8060-ff7eb41b3a54'
 USER_ID = 2036758982
 bot = telebot.TeleBot(TOKEN)
