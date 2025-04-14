@@ -16,7 +16,7 @@ from binance.client import Client
 with open('config.json', 'r') as f:
     config = json.load(f)
 
-BINANCE_API_KEY = config['UeHm9PGe26fcdGC3KRqgXXxoj7pC3A6to3inBkeJ3o4XhyGxpllCJlI9VCtwHuR0']
+BINANCE_API_KEY = config['binance_api_key']
 BINANCE_API_SECRET = config['binance_api_secret']
 
 TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
