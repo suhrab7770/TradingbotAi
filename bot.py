@@ -14,6 +14,9 @@ TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
 CMC_API_KEY = 'bd5f81f5-9e2c-4483-8060-ff7eb41b3a54'
 USER_ID = 2036758982
 bot = telebot.TeleBot(TOKEN)
+WEBHOOK_URL = 'https://tradingbotai-2.onrender.com/webhook'
+
+app = Flask(__name__)
 TOKENS = ["SOL", "JUP", "BONK", "PYTH"]
 TRADE_AMOUNT = 10  # 💸 Каждая сделка на $10
 TRADES_FILE = 'trades.json'
@@ -163,6 +166,22 @@ def callback_handler(call):
         price = get_token_price(call.data)
         bot.send_message(call.message.chat.id, f"💰 Текущая цена {call.data}: ${price}")
 
-# 🔁 Запуск в фоне
-threading.Thread(target=schedule_loop, daemon=True).start()
-bot.polling()
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    json_str = request.get_data().decode('UTF-8')
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return 'ok', 200
+
+@app.route('/')
+def index():
+    return 'Бот работает (Webhook)'
+
+# Установка Webhook при запуске
+bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_URL)
+
+# Запуск Flask и расписания
+if __name__ == '__main__':
+    threading.Thread(target=schedule_loop, daemon=True).start()
+    app.run(host='0.0.0.0', port=10000)
