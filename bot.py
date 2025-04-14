@@ -127,6 +127,34 @@ def schedule_loop():
         schedule.run_pending()
         time.sleep(1)
 
+WALLETS_FILE = 'wallets.json'
+
+# Загрузка кошельков
+if os.path.exists(WALLETS_FILE):
+    with open(WALLETS_FILE, 'r') as f:
+        wallets = json.load(f)
+else:
+    wallets = {}
+
+def save_wallets():
+    with open(WALLETS_FILE, 'w') as f:
+        json.dump(wallets, f, indent=2)
+
+@bot.message_handler(commands=['wallet'])
+def show_wallet(message):
+    uid = str(message.from_user.id)
+    if uid in wallets:
+        bot.send_message(message.chat.id, f"🔗 Ваш кошелёк:\n{wallets[uid]}")
+    else:
+        bot.send_message(message.chat.id, "❌ Кошелёк не подключён. Нажмите «🔗 Подключить кошелёк» в меню.")
+
+@bot.message_handler(func=lambda msg: msg.text and (msg.text.startswith("0x") or msg.text.endswith(".sol")))
+def handle_wallet_input(message):
+    uid = str(message.from_user.id)
+    wallets[uid] = message.text.strip()
+    save_wallets()
+    bot.send_message(message.chat.id, f"✅ Кошелёк сохранён:\n{wallets[uid]}")
+
 @bot.message_handler(commands=['start', 'menu'])
 def send_menu(message):
     markup = InlineKeyboardMarkup()
