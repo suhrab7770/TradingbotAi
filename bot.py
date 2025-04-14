@@ -15,7 +15,7 @@ TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
 CMC_API_KEY = 'bd5f81f5-9e2c-4483-8060-ff7eb41b3a54'
 USER_ID = 2036758982
 bot = telebot.TeleBot(TOKEN)
-WEBHOOK_URL = 'https://tradingbotai-2.onrender.com/webhook'
+WEBHOOK_URL = 'https://tradingbotai-1.onrender.com/webhook'
 
 app = Flask(__name__)
 TOKENS = ["SOL", "JUP", "BONK", "PYTH"]
