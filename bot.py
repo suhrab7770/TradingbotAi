@@ -47,11 +47,24 @@ def get_token_price(symbol):
         return "н/д"
 
 def get_historical_prices(symbol="SOL"):
-    timestamps = pd.date_range(end=pd.Timestamp.now(), periods=48, freq="30min")
-    prices = [100 + (i % 5) + (i / 20.0) for i in range(48)]
-    df = pd.DataFrame({"timestamp": timestamps, "price": prices})
-    df.set_index("timestamp", inplace=True)
-    return df
+    try:
+        ids = {
+            "SOL": "solana",
+            "JUP": "jupiter-exchange",
+            "BONK": "bonk",
+            "PYTH": "pyth-network"
+        }
+        cg_id = ids.get(symbol, symbol.lower())
+        url = f"https://api.coingecko.com/api/v3/coins/{cg_id}/market_chart?vs_currency=usd&days=2"
+        res = requests.get(url).json()
+        prices = res["prices"]  # формат: [[timestamp, price], ...]
+        df = pd.DataFrame(prices, columns=["timestamp", "price"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df.set_index("timestamp", inplace=True)
+        return df
+    except Exception as e:
+        print(f"Ошибка получения истории для {symbol}: {e}")
+        return pd.DataFrame()
 
 def calculate_indicators(df):
     df["MA10"] = df["price"].rolling(window=10).mean()
