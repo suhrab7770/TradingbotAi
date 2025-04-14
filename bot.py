@@ -11,6 +11,13 @@ import json
 import os
 from io import BytesIO
 from ai_helper import analyze_message  # ⬅️ Импорт AI помощника
+from binance.client import Client
+
+with open('config.json', 'r') as f:
+    config = json.load(f)
+
+BINANCE_API_KEY = config['UeHm9PGe26fcdGC3KRqgXXxoj7pC3A6to3inBkeJ3o4XhyGxpllCJlI9VCtwHuR0']
+BINANCE_API_SECRET = config['binance_api_secret']
 
 TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
 CMC_API_KEY = 'bd5f81f5-9e2c-4483-8060-ff7eb41b3a54'
@@ -22,6 +29,7 @@ app = Flask(__name__)
 TOKENS = ["SOL", "JUP", "BONK", "PYTH"]
 TRADE_AMOUNT = 10  # 💸 Каждая сделка на $10
 TRADES_FILE = 'trades.json'
+binance_client = Client(BINANCE_API_KEY, BINANCE_API_SECRET)
 
 # Загружаем историю сделок
 if os.path.exists(TRADES_FILE):
