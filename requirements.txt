@@ -3,3 +3,4 @@ requests
 schedule
 pandas
 matplotlib
+flask
