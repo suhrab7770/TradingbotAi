@@ -5,3 +5,4 @@ pandas
 matplotlib
 flask
 python-binance
+python-telegram-bot==20.3
