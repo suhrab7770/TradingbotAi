@@ -208,6 +208,14 @@ def webhook():
 def index():
     return 'Бот работает (Webhook)'
 
+# 👇 Автоматически показывать меню, если пользователь пишет любое сообщение
+@bot.message_handler(func=lambda message: True)
+def auto_menu(message):
+    # Игнорируем команды типа /wallet, /start
+    if message.text.startswith('/'):
+        return
+    send_menu(message)
+
 # Установка Webhook при запуске
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL)
