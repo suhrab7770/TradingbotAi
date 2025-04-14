@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import json
 import os
 from io import BytesIO
+from ai_helper import analyze_message  # ⬅️ Импорт AI помощника
 
 TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
 CMC_API_KEY = 'bd5f81f5-9e2c-4483-8060-ff7eb41b3a54'
@@ -215,6 +216,23 @@ def auto_menu(message):
     if message.text.startswith('/'):
         return
     send_menu(message)
+
+@bot.message_handler(func=lambda message: message.text)
+def ai_text_handler(message):
+    text = message.text.strip()
+    for token in TOKENS:
+        if token.lower() in text.lower():
+            # Берём данные по индикаторам
+            df = get_historical_prices(token)
+            df = calculate_indicators(df)
+            indicators = {
+                "rsi": df["RSI"].iloc[-1],
+                "ma": df["MA10"].iloc[-1],
+                "price": df["price"].iloc[-1]
+            }
+            response = analyze_message(text, indicators)
+            bot.send_message(message.chat.id, response)
+            return
 
 # Установка Webhook при запуске
 bot.remove_webhook()
