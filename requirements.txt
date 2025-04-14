@@ -4,3 +4,4 @@ schedule
 pandas
 matplotlib
 flask
+python-binance
