@@ -10,87 +10,50 @@ import matplotlib.pyplot as plt
 import json
 import os
 from io import BytesIO
-from ai_helper import analyze_message  # ⬅️ Импорт AI помощника
-from binance.client import Client
 
-BINANCE_API_KEY = "yOXw4V7X3YIcPaPH4Pg3jnLChJEUHZFRQxKTrPmn9hOdnVpjcw9F445Prg7ZpWVH"
-BINANCE_API_SECRET = "L4vhAKovcc8WrbIIHvDRobbbfYVq1p0F0g3e7LrkwMC5WWXBhkA7ukEVnVbimb15"
-
-client = Client(BINANCE_API_KEY, BINANCE_API_SECRET)
+# 📌 Настройки
 TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
-CMC_API_KEY = 'bd5f81f5-9e2c-4483-8060-ff7eb41b3a54'
+MEXC_API_KEY = 'mx0vglQuKSpVyUhZnd'
+MEXC_SECRET = '325f9d3d2c4144c0aecd8dd32843d72d'
 USER_ID = 2036758982
-bot = telebot.TeleBot(TOKEN)
 WEBHOOK_URL = 'https://tradingbotai-1.onrender.com/webhook'
 
+bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
-TOKENS = ["SOL", "JUP", "BONK", "PYTH"]
-TRADE_AMOUNT = 10  # 💸 Каждая сделка на $10
-TRADES_FILE = 'trades.json'
-binance_client = Client(BINANCE_API_KEY, BINANCE_API_SECRET)
 
-# Загружаем историю сделок
-if os.path.exists(TRADES_FILE):
-    with open(TRADES_FILE, 'r') as f:
-        trades = json.load(f)
-else:
-    trades = []
+TOKENS = ["SOL", "JUP", "BONK", "PYTH"]
+TRADE_AMOUNT = 10
+TRADES_FILE = 'trades.json'
+WALLETS_FILE = 'wallets.json'
+
+# Загрузка истории
+trades = json.load(open(TRADES_FILE)) if os.path.exists(TRADES_FILE) else []
+wallets = json.load(open(WALLETS_FILE)) if os.path.exists(WALLETS_FILE) else {}
 
 def save_trades():
     with open(TRADES_FILE, 'w') as f:
         json.dump(trades, f, indent=2)
 
+def save_wallets():
+    with open(WALLETS_FILE, 'w') as f:
+        json.dump(wallets, f, indent=2)
+
 def get_token_price(symbol):
     try:
-        url = f"https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-        headers = {'X-CMC_PRO_API_KEY': CMC_API_KEY}
-        params = {'symbol': symbol, 'convert': 'USD'}
-        res = requests.get(url, headers=headers, params=params).json()
-        price = res["data"][symbol]["quote"]["USD"]["price"]
+        url = f"https://www.mexc.com/open/api/v2/market/ticker?symbol={symbol}_USDT"
+        res = requests.get(url).json()
+        price = float(res['data'][0]['last'])
         return round(price, 6)
     except Exception as e:
-        print(f"Ошибка цены {symbol}: {e}")
+        print(f"Ошибка получения цены {symbol}: {e}")
         return "н/д"
-# Функция-заглушка (на случай ошибки или отсутствия токена на Binance)
-def get_fake_history(symbol):
-    print(f"⚠️ Используется фейковая история для {symbol}")
+
+def get_historical_prices(symbol="SOL"):
     timestamps = pd.date_range(end=pd.Timestamp.now(), periods=48, freq="30min")
     prices = [100 + (i % 5) + (i / 20.0) for i in range(48)]
     df = pd.DataFrame({"timestamp": timestamps, "price": prices})
     df.set_index("timestamp", inplace=True)
     return df
-
-def get_historical_prices(symbol="SOL"):
-    try:
-        # Сопоставление тикеров Binance
-        binance_pairs = {
-            "SOL": "SOLUSDT",
-            "JUP": "JUPUSDT",
-            "BONK": "BONKUSDT",
-            "PYTH": "PYTHUSDT"
-        }
-
-        pair = binance_pairs.get(symbol.upper())
-        if not pair:
-            raise ValueError(f"❌ Неизвестный символ: {symbol}")
-
-        # Получаем 48 свечей по 30 минут (24 часа)
-        klines = binance_client.get_klines(
-            symbol=pair,
-            interval=Client.KLINE_INTERVAL_30MINUTE,
-            limit=48
-        )
-
-        timestamps = [pd.to_datetime(k[0], unit='ms') for k in klines]
-        prices = [float(k[4]) for k in klines]  # Цена закрытия свечи
-
-        df = pd.DataFrame({"timestamp": timestamps, "price": prices})
-        df.set_index("timestamp", inplace=True)
-        return df
-
-    except Exception as e:
-        print(f"📉 Ошибка получения истории с Binance для {symbol}: {e}")
-        return get_fake_history(symbol)
 
 def calculate_indicators(df):
     df["MA10"] = df["price"].rolling(window=10).mean()
@@ -130,7 +93,6 @@ def ai_signal(symbol):
         ma = df["MA10"].iloc[-1]
         price = df["price"].iloc[-1]
         msg = f"📊 {symbol}:\nЦена: ${round(price,4)} | RSI: {round(rsi,1)} | MA10: ${round(ma,4)}\n"
-
         if rsi < 30 and price < ma:
             msg += "🤖 AI: Сильная точка входа (перепродан)"
             return msg, True
@@ -167,26 +129,13 @@ def schedule_loop():
         schedule.run_pending()
         time.sleep(1)
 
-WALLETS_FILE = 'wallets.json'
-
-# Загрузка кошельков
-if os.path.exists(WALLETS_FILE):
-    with open(WALLETS_FILE, 'r') as f:
-        wallets = json.load(f)
-else:
-    wallets = {}
-
-def save_wallets():
-    with open(WALLETS_FILE, 'w') as f:
-        json.dump(wallets, f, indent=2)
-
 @bot.message_handler(commands=['wallet'])
 def show_wallet(message):
     uid = str(message.from_user.id)
     if uid in wallets:
         bot.send_message(message.chat.id, f"🔗 Ваш кошелёк:\n{wallets[uid]}")
     else:
-        bot.send_message(message.chat.id, "❌ Кошелёк не подключён. Нажмите «🔗 Подключить кошелёк» в меню.")
+        bot.send_message(message.chat.id, "❌ Кошелёк не подключён. Отправьте его в чат.")
 
 @bot.message_handler(func=lambda msg: msg.text and (msg.text.startswith("0x") or msg.text.endswith(".sol")))
 def handle_wallet_input(message):
@@ -200,12 +149,11 @@ def send_menu(message):
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
     markup.add(
-    InlineKeyboardButton("📈 AI сигналы", callback_data="all_signals"),
-    InlineKeyboardButton("📉 График SOL", callback_data="chart_SOL"),
-    InlineKeyboardButton("🧾 История сделок", callback_data="history"),
-    InlineKeyboardButton("🔗 Подключить кошелёк", callback_data="connect_wallet")
-)
-
+        InlineKeyboardButton("📈 AI сигналы", callback_data="all_signals"),
+        InlineKeyboardButton("📉 График SOL", callback_data="chart_SOL"),
+        InlineKeyboardButton("🧾 История сделок", callback_data="history"),
+        InlineKeyboardButton("🔗 Подключить кошелёк", callback_data="connect_wallet")
+    )
     for token in TOKENS:
         markup.add(InlineKeyboardButton(f"💰 Цена {token}", callback_data=token))
     bot.send_message(message.chat.id, "👋 Добро пожаловать! Выберите действие:", reply_markup=markup)
@@ -213,11 +161,8 @@ def send_menu(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     if call.data == "all_signals":
-        full_msg = ""
-        for token in TOKENS:
-            msg, _ = ai_signal(token)
-            full_msg += msg + "\n\n"
-        bot.send_message(call.message.chat.id, full_msg)
+        msg = "\n\n".join([ai_signal(token)[0] for token in TOKENS])
+        bot.send_message(call.message.chat.id, msg)
     elif call.data == "history":
         if not trades:
             bot.send_message(call.message.chat.id, "📉 Сделок пока нет.")
@@ -246,34 +191,13 @@ def webhook():
 
 @app.route('/')
 def index():
-    return 'Бот работает (Webhook)'
+    return '🤖 Бот работает (Webhook)'
 
-@bot.message_handler(func=lambda message: message.text and not message.text.startswith("/"))
-def handle_text_message(message):
-    text = message.text.strip()
-
-    for token in TOKENS:
-        if token.lower() in text.lower():
-            # AI-обработка токена
-            df = get_historical_prices(token)
-            df = calculate_indicators(df)
-            indicators = {
-                "rsi": df["RSI"].iloc[-1],
-                "ma": df["MA10"].iloc[-1],
-                "price": df["price"].iloc[-1]
-            }
-            response = analyze_message(text, indicators)
-            bot.send_message(message.chat.id, response)
-            return
-
-    # Если токенов нет в тексте — просто показываем меню
-    send_menu(message)
-
-# Установка Webhook при запуске
+# Установка webhook
 bot.remove_webhook()
 bot.set_webhook(url=WEBHOOK_URL)
 
-# Запуск Flask и расписания
+# Запуск
 if __name__ == '__main__':
     threading.Thread(target=schedule_loop, daemon=True).start()
     app.run(host='0.0.0.0', port=10000)
