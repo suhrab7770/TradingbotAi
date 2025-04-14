@@ -160,10 +160,12 @@ def send_menu(message):
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
     markup.add(
-        InlineKeyboardButton("📈 AI сигналы", callback_data="all_signals"),
-        InlineKeyboardButton("📉 График SOL", callback_data="chart_SOL"),
-        InlineKeyboardButton("🧾 История сделок", callback_data="history")
-    )
+    InlineKeyboardButton("📈 AI сигналы", callback_data="all_signals"),
+    InlineKeyboardButton("📉 График SOL", callback_data="chart_SOL"),
+    InlineKeyboardButton("🧾 История сделок", callback_data="history"),
+    InlineKeyboardButton("🔗 Подключить кошелёк", callback_data="connect_wallet")
+)
+
     for token in TOKENS:
         markup.add(InlineKeyboardButton(f"💰 Цена {token}", callback_data=token))
     bot.send_message(message.chat.id, "👋 Добро пожаловать! Выберите действие:", reply_markup=markup)
