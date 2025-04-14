@@ -209,20 +209,13 @@ def webhook():
 def index():
     return 'Бот работает (Webhook)'
 
-# 👇 Автоматически показывать меню, если пользователь пишет любое сообщение
-@bot.message_handler(func=lambda message: True)
-def auto_menu(message):
-    # Игнорируем команды типа /wallet, /start
-    if message.text.startswith('/'):
-        return
-    send_menu(message)
-
-@bot.message_handler(func=lambda message: message.text)
-def ai_text_handler(message):
+@bot.message_handler(func=lambda message: message.text and not message.text.startswith("/"))
+def handle_text_message(message):
     text = message.text.strip()
+
     for token in TOKENS:
         if token.lower() in text.lower():
-            # Берём данные по индикаторам
+            # AI-обработка токена
             df = get_historical_prices(token)
             df = calculate_indicators(df)
             indicators = {
@@ -233,6 +226,9 @@ def ai_text_handler(message):
             response = analyze_message(text, indicators)
             bot.send_message(message.chat.id, response)
             return
+
+    # Если токенов нет в тексте — просто показываем меню
+    send_menu(message)
 
 # Установка Webhook при запуске
 bot.remove_webhook()
