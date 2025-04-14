@@ -8,7 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-TOKEN = '7580720199:AAE1mgv_7D2j7SFnEug57Ja5Xit7YN861BE'
+TOKEN = '7582918522:AAEsqowrP7ftba8nW6TbGgjdQ3Eivrzg7Cs'
 USER_ID = 2036758982
 bot = telebot.TeleBot(TOKEN)
 TOKENS = ["SOL", "JUP", "BONK", "PYTH"]
